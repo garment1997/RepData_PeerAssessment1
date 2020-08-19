@@ -4,22 +4,87 @@ output:
   html_document:
     keep_md: true
 ---
-
-
 ## Loading and preprocessing the data
 
-
-
+````{r}
+data <- read.csv(unz("activity.zip", "activity.csv"))
+data$date <- as.Date(data$date, format = "%Y-%m-%d")
+str(data)
+summary(data)
+````
 ## What is mean total number of steps taken per day?
 
+```{r, message=FALSE}
+library(dplyr)
+library(lubridate) #library for dealing with data
+library(ggplot2)
+data.day <- data %>% group_by(date) %>% summarize(steps = sum(steps))
+steps.mean = mean(data.day$steps,na.rm =TRUE)
+steps.median = median(data.day$steps,na.rm =TRUE)
+```
 
+The steps mean is `r steps.mean` and the median is `r steps.median`. Here we can see its histogram:
+
+```{r}
+hist(data.day$steps[!is.nan(data.day$steps)], xlab = "steps", main = "Histogram of steps", breaks = 30)
+```
 
 ## What is the average daily activity pattern?
+```{r, message=FALSE}
+data.interval <- data %>% group_by(interval) %>% summarize(steps = mean(steps, na.rm = TRUE)) 
+ggplot(data=data.interval, aes(x=interval, y=steps, na.rm=TRUE))+
+  geom_line()+
+  geom_smooth()+
+  ylim(c(0,205))
 
-
+```
 
 ## Imputing missing values
 
+```{r}
+total.na <- sum(is.na(data))
+percent.na <- mean(is.na(data))
+```
+
+There are `r total.na` NA's in the dataset, which represent the `r percent.na` %.
+
+With the following for loop these missing values are imputed by the mean of the interval.
+```{r}
+data.filled <- data
+for (i in 1:dim(data.filled)[1])
+  {
+  if (is.na(data.filled$steps[i])== TRUE)
+    {
+    data.filled$steps[i] <- round( mean(data[data$interval == data.filled[i, "interval"], "steps" ], na.rm = TRUE) )
+    }
+  
+}
+
+```
+```{r, message=FALSE}
+data.day <- data.filled %>% group_by(date) %>% summarize(steps = sum(steps))
+steps.mean = mean(data.day$steps,na.rm =TRUE)
+steps.median = median(data.day$steps,na.rm =TRUE)
+```
+
+The steps mean is `r steps.mean` and the median is `r steps.median`. Here we can see its histogram:
+
+```{r}
+hist(data.day$steps[!is.nan(data.day$steps)], xlab = "steps", main = "Histogram of steps", breaks = 30)
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, message = FALSE}
+data.filled$weekend <- ifelse(weekdays(data.filled$date, abbreviate = TRUE) %in% c("sá.", "do."), "weekend", "no weekend")
+data.filled$weekend <- as.factor(data.filled$weekend)
+
+data.interval <- data.filled %>% group_by(interval, weekend) %>% summarize(steps = mean(steps, na.rm = TRUE)) 
+ggplot(data=data.interval, aes(x=interval, y=steps, fill = weekend))+
+  facet_grid(weekend~.)+
+  geom_line()+
+  geom_smooth()+
+  ylim(c(0,205))
+
+```
+
